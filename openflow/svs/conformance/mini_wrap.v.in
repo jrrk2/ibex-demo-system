@@ -1,0 +1,19 @@
+// GENERATED from mini_wrap.v.in — presents the clean `ibex_mini_system` name
+// (what tb_conf.sv instantiates) around the SVS-specialised top module
+// @@TOP@@ (name embeds the baked SRAMInitFile).
+module ibex_mini_system (
+  input  logic       clk_sys_i,
+  input  logic       rst_sys_ni,
+  input  logic [7:0] gp_i,
+  output logic [7:0] gp_o,
+  input  logic       tck_i,
+  input  logic       tms_i,
+  input  logic       trst_ni,
+  input  logic       td_i,
+  output logic       td_o);
+  @@TOP@@ u (
+    .clk_sys_i(clk_sys_i), .rst_sys_ni(rst_sys_ni),
+    .gp_i(gp_i), .gp_o(gp_o),
+    .tck_i(tck_i), .tms_i(tms_i), .trst_ni(trst_ni),
+    .td_i(td_i), .td_o(td_o));
+endmodule

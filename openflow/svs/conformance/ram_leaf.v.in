@@ -1,0 +1,36 @@
+// GENERATED from ram_leaf.v.in — behavioural TDP RAM replacing the SVS-emitted
+// prim_generic_ram_2p leaf, so every SVS netlist (behavioural / hardcaml /
+// mapped) Verilates with a native reg[] array + $readmemh program init loaded
+// per-test from the +VMEM plusarg.  @@MOD@@ is substituted with the exact leaf
+// module name extracted from the emitted netlist.
+module @@MOD@@ (
+    a_wdata_i, b_wdata_i, a_addr_i, b_addr_i, a_wmask_i, a_write_i, a_req_i,
+    b_wmask_i, clk_a_i, clk_b_i, b_write_i, b_req_i, b_rdata_o, a_rdata_o, cfg_i
+);
+    input  [19:0] cfg_i;
+    input  [31:0] a_wdata_i, b_wdata_i;
+    input  [11:0] a_addr_i, b_addr_i;
+    input  [31:0] a_wmask_i, b_wmask_i;
+    input         a_write_i, a_req_i, clk_a_i, clk_b_i, b_write_i, b_req_i;
+    output reg [31:0] b_rdata_o, a_rdata_o;
+    reg [31:0] mem [0:4095];
+    integer i; reg [8191:0] vmempath;
+    reg [31:0] tohost = 32'h00100100;   // conformance signal word (gp==1 => PASS)
+    initial begin
+      for (i = 0; i < 4096; i = i + 1) mem[i] = 32'h0;
+      if ($value$plusargs("VMEM=%s", vmempath)) $readmemh(vmempath, mem);
+      void'($value$plusargs("TOHOST=%h", tohost));
+    end
+    always @(posedge clk_a_i) if (a_req_i) begin
+      // detect the CPU's store to `tohost` (netlist-agnostic pass/fail probe)
+      if (a_write_i && a_addr_i == tohost[13:2]) begin
+        $display("TOHOST %08x", a_wdata_i); $finish;
+      end
+      if (a_write_i) mem[a_addr_i] <= (mem[a_addr_i] & ~a_wmask_i) | (a_wdata_i & a_wmask_i);
+      a_rdata_o <= mem[a_addr_i];
+    end
+    always @(posedge clk_b_i) if (b_req_i) begin
+      if (b_write_i) mem[b_addr_i] <= (mem[b_addr_i] & ~b_wmask_i) | (b_wdata_i & b_wmask_i);
+      b_rdata_o <= mem[b_addr_i];
+    end
+endmodule
