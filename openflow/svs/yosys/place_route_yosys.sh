@@ -9,15 +9,16 @@
 # the ibex fasm post-processing from pnr_yosys_flow.sh.
 # ---------------------------------------------------------------------------
 set -eu
-ROOT=/home/jonathan/v7-johnson-demo
-SVS=$ROOT/deps/System-Verilog-suite
+# Paths overridable so the top-level Makefile can drive this.
+ROOT=${ROOT:-/home/jonathan/v7-johnson-demo}
+SVS=${SVS:-$ROOT/deps/System-Verilog-suite}
 OF=$ROOT/ibexsoc/openflow
 ETH=$ROOT/ethsoc
-PXDB=$ROOT/deps/prjxray/database/virtex7
-PXPY=$ROOT/deps/prjxray/env/bin/python
+PXDB=${PXDB:-$ROOT/deps/prjxray/database/virtex7}
+PXPY=${PXPY:-$ROOT/deps/prjxray/env/bin/python}
 PART=xc7vx485tffg1761-2
-NEXTPNR=$ROOT/deps/nextpnr-xilinx/build/nextpnr-xilinx
-CHIPDB=$ROOT/deps/nextpnr-xilinx/xilinx/xc7vx485t.bin
+NEXTPNR=${NEXTPNR:-$ROOT/deps/nextpnr-xilinx/build/nextpnr-xilinx}
+CHIPDB=${CHIPDB:-$ROOT/deps/nextpnr-xilinx/xilinx/xc7vx485t.bin}
 GOLDEN_BIT=${GOLDEN_BIT:-$ROOT/ibexsoc/build/lowrisc_ibex_demo_system_0/synth_vc707-vivado/lowrisc_ibex_demo_system_0.runs/impl_1/top_vc707.bit}
 LOCK="flock /tmp/nextpnr.lock"
 

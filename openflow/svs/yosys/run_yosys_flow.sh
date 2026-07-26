@@ -14,12 +14,15 @@
 set -e
 STAGE="${1:-all}"
 
-REPO=/home/jonathan/v7-johnson-demo/ibexsoc
-SVSROOT=/home/jonathan/v7-johnson-demo/deps/System-Verilog-suite
+# Paths are overridable so the top-level Makefile can drive this (ROOT/SVSROOT/
+# YOSYS); the defaults match a standard checkout on this machine.
+ROOT=${ROOT:-/home/jonathan/v7-johnson-demo}
+REPO=$ROOT/ibexsoc
+SVSROOT=${SVSROOT:-$ROOT/deps/System-Verilog-suite}
 SVS=$SVSROOT/_build/default/sv_suite.exe
 LUA=$REPO/openflow/svs/ibex_mini_svs.lua
-YOSYS=/home/jonathan/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys
-YSHARE=$(dirname $(dirname $YOSYS))/share/yosys
+YOSYS=${YOSYS:-/home/jonathan/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys}
+YSHARE=$(dirname $(dirname $(readlink -f "$YOSYS")))/share/yosys
 
 W=${W:-/tmp/svs_ibex_yosys}
 CC=$W/cc
