@@ -1,0 +1,17 @@
+// GENERATED from soc_stub.v.in — a black-box declaration of the SVS-specialised
+// ibex_mini_system top (@@TOP@@, name embeds the baked SRAMInitFile) so Vivado's
+// synth_design can elaborate the RTL board top that instantiates it; the actual
+// implementation is supplied by read_edif (build_edif_bit.tcl) and stitched in.
+(* black_box *)
+module @@TOP@@ (
+  input  wire       clk_sys_i,
+  input  wire       rst_sys_ni,
+  input  wire [7:0] gp_i,
+  output wire [7:0] gp_o,
+  input  wire       tck_i,
+  input  wire       tms_i,
+  input  wire       trst_ni,
+  input  wire       td_i,
+  output wire       td_o
+);
+endmodule

@@ -1,0 +1,40 @@
+// GENERATED from top_mapped.v.in — VC707 board top for the SVS gate-mapped
+// ibex-mini, so the *mapped* netlist can be placed & routed into a bitstream.
+//
+// It wraps the parameter-less `ibex_mini_system` alias (see mini_wrap.v.in,
+// which renames the SVS-specialised top whose name embeds the baked
+// SRAMInitFile) in the board clock generator + reset + LEDs.  JTAG is idle
+// (the design's own BSCANE2 TAP is unused here); trst_ni carries the power-up
+// reset, matching rtl/fpga/top_vc707_mini.sv.
+module top_vc707_mini (
+  input        IO_CLK_P,   // 200 MHz LVDS system clock
+  input        IO_CLK_N,
+  input        IO_RST,     // CPU_RESET push button, active high
+  output [7:0] LED
+);
+  wire clk_sys, rst_sys_n, locked;
+  wire [7:0] led_int;
+
+  clkgen_vc707 clkgen (
+    .IO_CLK_P (IO_CLK_P),
+    .IO_CLK_N (IO_CLK_N),
+    .IO_RST_N (~IO_RST),
+    .clk_sys  (clk_sys),
+    .rst_sys_n(rst_sys_n),
+    .locked   (locked)
+  );
+
+  ibex_mini_system u_soc (
+    .clk_sys_i (clk_sys),
+    .rst_sys_ni(rst_sys_n),
+    .gp_i      (8'h00),
+    .gp_o      (led_int),
+    .tck_i     (1'b0),
+    .tms_i     (1'b0),
+    .trst_ni   (rst_sys_n),
+    .td_i      (1'b0),
+    .td_o      ()
+  );
+
+  assign LED = led_int;
+endmodule
