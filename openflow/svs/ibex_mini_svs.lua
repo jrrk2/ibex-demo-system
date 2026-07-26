@@ -197,6 +197,15 @@ if os.getenv("BEHAV_VERILOG") then
   print("WROTE behav verilog")
   return
 end
+-- EMIT_CREATE_CIRCUIT=<dir>: emit the pre-LUT-cover create_circuit netlist
+-- (arithmetic operators + hard-macro instances intact) for the FPGA variant,
+-- so an external optimiser (yosys synth_xilinx) can map it to LUT/CARRY4/DSP/
+-- RAMB and feed nextpnr — replacing SVS's own gate_map/LUT-cover.  Yields
+-- near-Vivado quality (75 CARRY4 / 5878 LUT / 1 DSP vs Vivado 76 / 4296).
+if os.getenv("EMIT_CREATE_CIRCUIT") then
+  print(svd.emit_create_circuit(p, os.getenv("EMIT_CREATE_CIRCUIT")))
+  return
+end
 local names = svd.module_names(p)
 NT={}; local cnt=0; local i=1; local n=strlen(names)
 while i<=n do local j=strfind(names,",",i,1); local nm
@@ -209,6 +218,27 @@ while k<=cnt do
   print("gate_map "..M)
   result = svd.splice(result, M, svd.mapped_to_prog(svd.gate_map(svd.pick(result,M),6,0)))
   k=k+1
+end
+-- NEXTPNR_JSON: emit the flattened netlist as nextpnr JSON for the PURE open
+-- flow (place_lef topographical placement -> nextpnr-xilinx route -> fasm ->
+-- prjxray bit), no Vivado.  Pair with NEXTPNR_JSON_CONST_STRINGS=1 so consts
+-- lower to GLOBAL_LOGIC0/1 and FPGA_LEC_NAMES=1 for placement reconcile.
+if os.getenv("NEXTPNR_JSON") then
+  -- resolve the specialised (name-mangled) top module top_vc707_mini__<params>
+  local names = svd.module_names(result)
+  local pick = nil
+  local i=1; local n=strlen(names)
+  while i<=n do local j=strfind(names,",",i,1); local nm
+    if j then nm=strsub(names,i,j-1); i=j+1 else nm=strsub(names,i,n); i=n+1 end
+    if nm=="top_vc707_mini" then pick=nm end
+    if not pick and strfind(nm, "top_vc707_mini__", 1, 1)==1 then pick=nm end
+  end
+  pick = pick or "top_vc707_mini"
+  local o2 = (os.getenv("W") or "/tmp/svs_ibex_mini") .. "/ibex_mini.json"
+  local net = svd.flatten_struct(result, pick)
+  svd.write_nextpnr_json(net, o2)
+  print("WROTE " .. o2 .. " (" .. pick .. ")")
+  return
 end
 -- HIER_VERILOG: emit HIERARCHICAL gate-mapped Verilog (per-module cells, NOT
 -- flattened) for xsim — avoids the flatten_structural driverless-net bug that
