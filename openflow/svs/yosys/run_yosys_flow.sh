@@ -38,7 +38,13 @@ if [ "$STAGE" = "emit" ] || [ "$STAGE" = "all" ]; then
   export MEMLOWER_FPGA=1 MEMLOWER_NO_LUTRAM=1
   export SVS_INCDIR="$REPO/vendor/lowrisc_ip/ip/prim/rtl:$REPO/vendor/lowrisc_ibex/vendor/lowrisc_ip/dv/sv/dv_utils"
   export SVS_REPO="$REPO"        # roots the source paths in ibex_mini_svs.lua
+  # Build the RAM image from source (needs an rv32 bare-metal gcc); baking it
+  # into RAMB36 is what keeps the CPU from being optimised away.  Idempotent.
   export SRAM_INIT="$REPO/sw/mini/johnson.vmem"
+  if ! make -s -C "$REPO/sw/mini" johnson.vmem; then
+    echo "failed to build $SRAM_INIT -- need an rv32 bare-metal gcc (set CROSS=)" >&2
+    exit 1
+  fi
   # keep primitive #(...) params (RAMB36 INIT, MMCM config, BSCANE2 JTAG_CHAIN)
   export SVS_CIRC_KEEP_PARAMS=1
   export EMIT_CREATE_CIRCUIT="$CC"
