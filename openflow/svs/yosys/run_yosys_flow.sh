@@ -22,7 +22,10 @@ SVSROOT=${SVSROOT:-$ROOT/deps/System-Verilog-suite}
 SVS=$SVSROOT/_build/default/sv_suite.exe
 LUA=$REPO/openflow/svs/ibex_mini_svs.lua
 YOSYS=${YOSYS:-/home/jonathan/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys}
-YSHARE=$(dirname $(dirname $(readlink -f "$YOSYS")))/share/yosys
+# GNU coreutils: on macOS `readlink -f`/`dirname` are the g-prefixed brew tools.
+command -v greadlink >/dev/null 2>&1 && READLINK=greadlink || READLINK=readlink
+command -v gdirname  >/dev/null 2>&1 && DIRNAME=gdirname  || DIRNAME=dirname
+YSHARE=$($DIRNAME $($DIRNAME $($READLINK -f "$YOSYS")))/share/yosys
 
 W=${W:-/tmp/svs_ibex_yosys}
 CC=$W/cc

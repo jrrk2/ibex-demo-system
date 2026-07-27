@@ -9,7 +9,9 @@
 #   ELFDIR=/tmp/svs_conformance/elf ./run_conformance_openocd.sh
 # ---------------------------------------------------------------------------
 set -eu
-HERE=$(cd "$(dirname "$0")" && pwd)
+# GNU coreutils: on macOS `dirname` is the g-prefixed brew tool.
+command -v gdirname >/dev/null 2>&1 && DIRNAME=gdirname || DIRNAME=dirname
+HERE=$(cd "$($DIRNAME "$0")" && pwd)
 OPENOCD=${OPENOCD:-/home/jonathan/riscv-openocd/src/openocd}
 ELFDIR=${ELFDIR:-/tmp/svs_conformance/elf}      # built by conformance/Makefile
 ENTRY=0x00100080                                # ibex reset PC = boot_addr+0x80

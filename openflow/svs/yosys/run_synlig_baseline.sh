@@ -10,7 +10,10 @@ set -eu
 REPO=/home/jonathan/v7-johnson-demo/ibexsoc
 LUA=$REPO/openflow/svs/ibex_mini_svs.lua
 SYNLIG=/home/jonathan/synlig/build/release/synlig/synlig
-YSHARE=$(dirname $(dirname $(readlink -f /home/jonathan/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys)))/share/yosys
+# GNU coreutils: on macOS `readlink -f`/`dirname` are the g-prefixed brew tools.
+command -v greadlink >/dev/null 2>&1 && READLINK=greadlink || READLINK=readlink
+command -v gdirname  >/dev/null 2>&1 && DIRNAME=gdirname  || DIRNAME=dirname
+YSHARE=$($DIRNAME $($DIRNAME $($READLINK -f /home/jonathan/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys)))/share/yosys
 W=${W:-/tmp/svs_ibex_synlig}
 mkdir -p "$W"
 
