@@ -38,6 +38,9 @@ if [ "$STAGE" = "emit" ] || [ "$STAGE" = "all" ]; then
   export MEMLOWER_FPGA=1 MEMLOWER_NO_LUTRAM=1
   export SVS_INCDIR="$REPO/vendor/lowrisc_ip/ip/prim/rtl:$REPO/vendor/lowrisc_ibex/vendor/lowrisc_ip/dv/sv/dv_utils"
   export SVS_REPO="$REPO"        # roots the source paths in ibex_mini_svs.lua
+  # Vivado-free primitive port directions (BUFG/IBUFDS/MMCME2_ADV/...): read the
+  # committed cache instead of Vivado's unisim .vhd (absent on non-Vivado hosts).
+  export XIL_PRIM_PORTS_JSON="${XIL_PRIM_PORTS_JSON:-$SVSROOT/xilinx_lef/xil_primitive_ports.json}"
   # Build the RAM image from source (needs an rv32 bare-metal gcc); baking it
   # into RAMB36 is what keeps the CPU from being optimised away.  Idempotent.
   export SRAM_INIT="$REPO/sw/mini/johnson.vmem"
