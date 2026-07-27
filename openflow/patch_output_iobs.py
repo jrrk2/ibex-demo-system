@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Splice golden's verbatim IOB config for the LVCMOS18 OUTPUT pins into the
-open-flow frames.  prjxray's virtex7 LIOB18 segbits for LVCMOS18 outputs are
-incomplete/wrong (same gap class as the rx-input and led[4] IOB fixes): the
-open-flow encoding is missing ~7 DRIVE/SLEW/OBUF bits per output and sets a few
-spurious ones, so fasm2frames cannot drive the LED/UART_TX pads even though the
-running CPU drives them internally (clk_sys + MMCM confirmed live via the USER1
-probe).  Because the open (R0) flow imports golden's PLACEMENT, golden's config
-for each fixed output IOB tile is directly reusable: we copy golden's words for
-each output tile's word-range across all its frames.
+"""LEGACY / OPTIONAL -- the ibex-mini open flow is splice-free by default and no
+longer calls this (validated on silicon 2026-07-27: johnson counter walks all 8
+LEDs from the open flow's own fasm2frames IOB config, no Vivado bit).
+
+History: this spliced "golden's" LVCMOS18 output-IOB config into the open
+frames.  The apparent "missing ~7 bits per output" was NOT a prjxray segbits
+gap -- it was a DESIGN MISMATCH: golden is the FULL lowrisc_ibex_demo_system
+(with UART), the open build is the cut-down mini (LED-only, no UART), so the
+splice copied the full demo's config (incl. UART_TX drive the mini doesn't
+have) onto the mini bit.  The mini's own output config is correct and self-
+consistent across all 8 LEDs.  Kept only for the opt-in GOLDEN_BIT path.
 
 Usage: patch_output_iobs.py <golden.bit> <in.frames> <out.frames>
 """

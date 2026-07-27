@@ -19,7 +19,11 @@ PXPY=${PXPY:-$ROOT/deps/prjxray/env/bin/python}
 PART=xc7vx485tffg1761-2
 NEXTPNR=${NEXTPNR:-$ROOT/deps/nextpnr-xilinx/build/nextpnr-xilinx}
 CHIPDB=${CHIPDB:-$ROOT/deps/nextpnr-xilinx/xilinx/xc7vx485t.bin}
-GOLDEN_BIT=${GOLDEN_BIT:-$ROOT/ibexsoc/build/lowrisc_ibex_demo_system_0/synth_vc707-vivado/lowrisc_ibex_demo_system_0.runs/impl_1/top_vc707.bit}
+# Splice-free by default (validated on silicon 2026-07-27: johnson counter walks
+# all 8 LEDs).  The ibex-mini is LED-only, so the open flow's own fasm2frames
+# output is the correct, Vivado-free IOB config.  Set GOLDEN_BIT=<vivado.bit>
+# ONLY to opt back into the legacy full-demo output-IOB splice.
+GOLDEN_BIT=${GOLDEN_BIT:-}
 LOCK="flock /tmp/nextpnr.lock"
 
 W=${W:-/tmp/svs_ibex_yosys}
@@ -76,7 +80,17 @@ echo "=== 6. fasm -> frames (+BSCANE2 +golden output-IOB) -> bit ==="
 XRAY_ALLOW_MISSING_FEATURES=1 $PXPY $ROOT/deps/prjxray/utils/fasm2frames.py \
   --db-root $PXDB --part $PART "$W/ibex_yosys.fasm" "$W/ibex_yosys.frames"
 python3 $ETH/patch_bscan.py "$W/ibex_yosys.frames" "$W/ibex_yosys_bscan.frames" "$W/ibex_yosys.fasm"
-python3 $OF/patch_output_iobs.py "$GOLDEN_BIT" "$W/ibex_yosys_bscan.frames" "$W/ibex_yosys_oiob.frames"
+# Output-IOB config: the ibex-mini is LED-only (no UART), so the open flow's own
+# fasm2frames output for the LED pads is the correct reference.  The historical
+# golden-bit splice mixed in the FULL demo's IOB config (different design) and
+# is only used if a golden bit is explicitly provided.
+if [ -n "${GOLDEN_BIT:-}" ] && [ -s "${GOLDEN_BIT:-}" ]; then
+  echo "  (output-IOB golden splice: $GOLDEN_BIT)"
+  python3 $OF/patch_output_iobs.py "$GOLDEN_BIT" "$W/ibex_yosys_bscan.frames" "$W/ibex_yosys_oiob.frames"
+else
+  echo "  (no golden bit -- splice-free: LED IOB config from prjxray fasm2frames)"
+  cp "$W/ibex_yosys_bscan.frames" "$W/ibex_yosys_oiob.frames"
+fi
 $ROOT/deps/prjxray/build/tools/xc7frames2bit --part_file $PXDB/$PART/part.yaml \
   --part_name $PART --frm_file "$W/ibex_yosys_oiob.frames" --output_file "$W/ibex_yosys.bit"
 echo "IBEX YOSYS+place_lef open-flow bit: $W/ibex_yosys.bit"; ls -la "$W/ibex_yosys.bit"
