@@ -27,6 +27,9 @@ JSON=$W/ibex_fpga_yosys.json
 test -s "$JSON"
 
 echo "=== 1. floorplan (prjxray tilegrid) ==="
+# gen_floorplan.py defaults PRJXRAY_TILEGRID to ~/prjxray (a Vivado-machine
+# checkout); point it at the DB the rest of this script already uses ($PXDB).
+export PRJXRAY_TILEGRID="${PRJXRAY_TILEGRID:-$PXDB/xc7vx485t/tilegrid.json}"
 if [ ! -s "$W/floorplan.json" ]; then
   python3 $SVS/xilinx_lef/gen_floorplan.py $W/floorplan.json > $W/floorplan.log 2>&1 \
     || { echo FLOORPLAN FAILED; tail -5 $W/floorplan.log; exit 1; }
