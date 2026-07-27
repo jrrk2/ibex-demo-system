@@ -25,16 +25,23 @@ YOSYS=${YOSYS:-/home/jonathan/OpenROAD-flow-scripts/tools/install/yosys/bin/yosy
 # GNU coreutils: on macOS `readlink -f`/`dirname` are the g-prefixed brew tools.
 command -v greadlink >/dev/null 2>&1 && READLINK=greadlink || READLINK=readlink
 command -v gdirname  >/dev/null 2>&1 && DIRNAME=gdirname  || DIRNAME=dirname
-# yosys' data dir (cells_sim.v etc.).  yosys-config --datdir is authoritative;
-# fall back to deriving it from the RESOLVED binary path ($YOSYS may be a bare
-# PATH name like "yosys", which readlink can't locate on its own).
-if command -v "${YOSYS}-config" >/dev/null 2>&1; then
+# yosys' data dir (cells_sim.v etc.).  For an in-tree, non-installed build --
+# like the pinned deps/yosys -- the share sits NEXT TO the binary and
+# `yosys-config --datdir` wrongly returns the compiled-in /usr/local prefix.
+# So: prefer the build-tree share, then a yosys-config that actually resolves,
+# then a derived path.  ($YOSYS may be a bare PATH name like "yosys".)
+YOSYS_RESOLVED=$(command -v "$YOSYS" 2>/dev/null || echo "$YOSYS")
+YDIR=$($DIRNAME "$($READLINK -f "$YOSYS_RESOLVED")")
+if   [ -f "$YDIR/share/xilinx/cells_sim.v" ];       then YSHARE="$YDIR/share"
+elif [ -f "$YDIR/share/yosys/xilinx/cells_sim.v" ]; then YSHARE="$YDIR/share/yosys"
+elif command -v "${YOSYS}-config" >/dev/null 2>&1 && \
+     [ -f "$("${YOSYS}-config" --datdir)/xilinx/cells_sim.v" ]; then
   YSHARE=$("${YOSYS}-config" --datdir)
-elif command -v yosys-config >/dev/null 2>&1; then
+elif command -v yosys-config >/dev/null 2>&1 && \
+     [ -f "$(yosys-config --datdir)/xilinx/cells_sim.v" ]; then
   YSHARE=$(yosys-config --datdir)
 else
-  YOSYS_BIN=$(command -v "$YOSYS" 2>/dev/null || echo "$YOSYS")
-  YSHARE=$($DIRNAME $($DIRNAME $($READLINK -f "$YOSYS_BIN")))/share/yosys
+  YSHARE="$($DIRNAME "$YDIR")/share/yosys"
 fi
 
 W=${W:-/tmp/svs_ibex_yosys}
