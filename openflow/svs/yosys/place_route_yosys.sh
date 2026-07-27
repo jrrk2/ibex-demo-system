@@ -71,10 +71,20 @@ echo "SKIPS=$SK"
 test -s "$W/ibex_yosys.fasm"
 
 echo "=== 5. slow CPU MMCM 50->25 MHz ==="
-sed -i \
-  -e "s/\(CMT_TOP_L_LOWER_B_X305Y269.MMCME2_ADV.CLKOUT0_CLKOUT1_HIGH_TIME\[5:0\] = \)6.b001010/\16'b010100/" \
-  -e "s/\(CMT_TOP_L_LOWER_B_X305Y269.MMCME2_ADV.CLKOUT0_CLKOUT1_LOW_TIME\[5:0\] = \)6.b001010/\16'b010100/" \
-  "$W/ibex_yosys.fasm" || true
+# Match ANY MMCM tile (there is exactly one) -- the tile coord depends on
+# placement, which shifts with the yosys version, so a hardcoded coord silently
+# missed on a differently-built netlist and left the core at 50 MHz (LEDs still
+# count, but the debug-module CDC fails timing -> JTAG halt hangs).
+sed -i -E \
+  -e "s/(CMT_TOP_[A-Z_]*_X[0-9]+Y[0-9]+\.MMCME2_ADV\.CLKOUT0_CLKOUT1_HIGH_TIME\[5:0\] = )6'b001010/\16'b010100/" \
+  -e "s/(CMT_TOP_[A-Z_]*_X[0-9]+Y[0-9]+\.MMCME2_ADV\.CLKOUT0_CLKOUT1_LOW_TIME\[5:0\] = )6'b001010/\16'b010100/" \
+  "$W/ibex_yosys.fasm"
+# Fail loudly if the slowdown did not take -- a 50 MHz core breaks JTAG debug.
+if ! grep -q "MMCME2_ADV.CLKOUT0_CLKOUT1_HIGH_TIME\[5:0\] = 6'b010100" "$W/ibex_yosys.fasm"; then
+  echo "ERROR: MMCM 50->25 MHz slowdown did not apply (unexpected MMCM CLKOUT config)" >&2
+  grep -E "MMCME2_ADV.CLKOUT0_CLKOUT1_(HIGH|LOW)_TIME" "$W/ibex_yosys.fasm" >&2 || true
+  exit 1
+fi
 
 echo "=== 6. fasm -> frames (+BSCANE2 +golden output-IOB) -> bit ==="
 XRAY_ALLOW_MISSING_FEATURES=1 $PXPY $ROOT/deps/prjxray/utils/fasm2frames.py \
