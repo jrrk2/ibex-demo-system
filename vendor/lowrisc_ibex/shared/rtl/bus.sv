@@ -11,7 +11,12 @@
  * This implementation doesn't handle the full bus protocol, but makes the
  * following simplifying assumptions.
  *
- * - All devices (slaves) must respond in the next cycle after the request.
+ * - A single outstanding transaction at a time (new requests are held off,
+ *   via gnt, until the current one responds).
+ * - Devices (slaves) may take an arbitrary number of cycles to respond: the
+ *   bus holds the response steering until device_rvalid_i is seen.  A device
+ *   that responds in the cycle after its request (the classic case) behaves
+ *   exactly as before, with no throughput penalty.
  * - Host (master) arbitration is strictly priority based.
  */
 module bus #(
@@ -56,12 +61,22 @@ module bus #(
 
   logic host_sel_valid;
   logic device_sel_valid;
-  logic decode_err_resp;
 
-  logic [NumBitsHostSel-1:0] host_sel_req, host_sel_resp;
-  logic [NumBitsDeviceSel-1:0] device_sel_req, device_sel_resp;
+  logic [NumBitsHostSel-1:0]   host_sel_req;
+  logic [NumBitsDeviceSel-1:0] device_sel_req;
 
-  // Master select prio arbiter
+  // In-flight (outstanding) transaction bookkeeping.  Unlike the original
+  // fixed-1-cycle bus, the response steering is latched and held until the
+  // selected device actually responds, so slow devices are supported.
+  logic                        outstanding_q;
+  logic [NumBitsHostSel-1:0]   resp_host_q;
+  logic [NumBitsDeviceSel-1:0] resp_dev_q;
+  logic                        resp_err_q;   // decode miss: respond err, no device
+
+  logic accept;      // a new request is captured this cycle
+  logic resp_valid;  // the in-flight transaction responds this cycle
+
+  // Master select prio arbiter (host 0 = highest priority)
   always_comb begin
     host_sel_valid = 1'b0;
     host_sel_req = '0;
@@ -73,7 +88,7 @@ module bus #(
     end
   end
 
-  // Device select
+  // Device select for the currently selected host's address
   always_comb begin
     device_sel_valid = 1'b0;
     device_sel_req = '0;
@@ -86,24 +101,37 @@ module bus #(
     end
   end
 
+  // The in-flight transaction responds when its device raises rvalid, or
+  // immediately (next cycle) for a decode miss.
+  assign resp_valid = outstanding_q &
+                      (resp_err_q | device_rvalid_i[resp_dev_q]);
+
+  // Accept a new request when the bus is idle, or in the same cycle the
+  // current one completes (keeps back-to-back 1-cycle devices at full rate).
+  assign accept = host_sel_valid & (~outstanding_q | resp_valid);
+
   always_ff @(posedge clk_i or negedge rst_ni) begin
-     if (!rst_ni) begin
-        host_sel_resp <= '0;
-        device_sel_resp <= '0;
-        decode_err_resp <= 1'b0;
-     end else begin
-        // Responses are always expected 1 cycle after the request
-        device_sel_resp <= device_sel_req;
-        host_sel_resp <= host_sel_req;
-        // Decode failed; no device matched?
-        decode_err_resp <= host_sel_valid & !device_sel_valid;
-     end
+    if (!rst_ni) begin
+      outstanding_q <= 1'b0;
+      resp_host_q   <= '0;
+      resp_dev_q    <= '0;
+      resp_err_q    <= 1'b0;
+    end else if (accept) begin
+      outstanding_q <= 1'b1;
+      resp_host_q   <= host_sel_req;
+      resp_dev_q    <= device_sel_req;
+      resp_err_q    <= ~device_sel_valid;
+    end else if (resp_valid) begin
+      outstanding_q <= 1'b0;
+    end
   end
 
+  // Drive the selected device for exactly one cycle (the accept cycle).  The
+  // device must capture address/wdata with its request, as before.
   always_comb begin
     for (integer device = 0; device < NrDevices; device = device + 1) begin
-      if (device_sel_valid && NumBitsDeviceSel'(device) == device_sel_req) begin
-        device_req_o[device]   = host_req_i[host_sel_req];
+      if (accept && device_sel_valid && NumBitsDeviceSel'(device) == device_sel_req) begin
+        device_req_o[device]   = 1'b1;
         device_we_o[device]    = host_we_i[host_sel_req];
         device_addr_o[device]  = host_addr_i[host_sel_req];
         device_wdata_o[device] = host_wdata_i[host_sel_req];
@@ -118,19 +146,29 @@ module bus #(
     end
   end
 
+  // Grant the accepted host; route the response to the in-flight host.
   always_comb begin
     for (integer host = 0; host < NrHosts; host = host + 1) begin
-      host_gnt_o[host] = 1'b0;
-      if (NumBitsHostSel'(host) == host_sel_resp) begin
-        host_rvalid_o[host] = device_rvalid_i[device_sel_resp] | decode_err_resp;
-        host_err_o[host]    = device_err_i[device_sel_resp]    | decode_err_resp;
-        host_rdata_o[host]  = device_rdata_i[device_sel_resp];
+      host_gnt_o[host]    = 1'b0;
+      host_rvalid_o[host] = 1'b0;
+      host_err_o[host]    = 1'b0;
+      host_rdata_o[host]  = 'b0;
+    end
+
+    if (accept) begin
+      host_gnt_o[host_sel_req] = 1'b1;
+    end
+
+    if (outstanding_q) begin
+      if (resp_err_q) begin
+        host_rvalid_o[resp_host_q] = 1'b1;
+        host_err_o[resp_host_q]    = 1'b1;
+        host_rdata_o[resp_host_q]  = 'b0;
       end else begin
-        host_rvalid_o[host] = 1'b0;
-        host_err_o[host]    = 1'b0;
-        host_rdata_o[host]  = 'b0;
+        host_rvalid_o[resp_host_q] = device_rvalid_i[resp_dev_q];
+        host_err_o[resp_host_q]    = device_err_i[resp_dev_q];
+        host_rdata_o[resp_host_q]  = device_rdata_i[resp_dev_q];
       end
     end
-    host_gnt_o[host_sel_req] = host_req_i[host_sel_req];
   end
 endmodule

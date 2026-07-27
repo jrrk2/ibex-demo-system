@@ -95,6 +95,25 @@ filesets:
       - data/pins_artya7.xdc
     file_type: xdc
 
+  files_xilinx_vc707:
+    depend:
+      - lowrisc:ibex:rv_timer
+      - lowrisc:ibex:fpga_xilinx_shared
+    files:
+      - rtl/fpga/clkgen_vc707.sv
+      - rtl/fpga/top_vc707.sv
+    file_type: systemVerilogSource
+
+  files_constraints_vc707:
+    files:
+      - data/pins_vc707.xdc
+    file_type: xdc
+
+  files_tcl_vc707:
+    files:
+      - data/vc707_synth_opts.tcl
+    file_type: tclSource
+
   files_constraints_cw305:
     files:
       - data/pins_cw305.xdc
@@ -153,6 +172,21 @@ targets:
   default: &default_target
     filesets:
       - files_rtl
+  synth_vc707:
+    <<: *default_target
+    default_tool: vivado
+    filesets_append:
+      - files_xilinx_vc707
+      - files_constraints_vc707
+      - files_tcl_vc707
+    toplevel: top_vc707
+    tools:
+      vivado:
+        part: "xc7vx485tffg1761-2"
+    parameters:
+      - SRAMInitFile
+      - PRIM_DEFAULT_IMPL=prim_pkg::ImplXilinx
+
   synth:
     <<: *default_target
     default_tool: vivado

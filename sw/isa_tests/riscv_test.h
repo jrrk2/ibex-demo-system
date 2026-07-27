@@ -23,23 +23,32 @@
 
 #define INTERRUPT_HANDLER j other_exception
 
-/* ibex FORCES mtvec into VECTORED mode (mtvec[1:0]=01) with a 256-byte
-   aligned base.  In vectored mode synchronous EXCEPTIONS (incl. ecall) jump
-   to base+0, not base+4*cause.  So the trap handler MUST sit at the mtvec
-   base.  We make the base = start of .text.init (0x00100000, already
-   256-aligned), place the handler there, and put _start AFTER it — the
-   debugger sets pc = ELF entry (_start) after load, so _start need not be at
-   the image base. */
+/* ibex trap vector = boot_addr (0x00100000, 256-aligned), VECTORED
+   (mtvec[1:0]=01): interrupts jump to base+4*cause, synchronous exceptions
+   (incl. ecall) to base+0.  The vector table therefore holds JUMPS ONLY — one
+   4-byte `j trap_entry` per cause slot — and the handler proper lives outside
+   it.  ibex's RESET PC is boot_addr + 0x80, so _start sits at base+0x80 (right
+   above the 0x80-byte vector table) and the CPU boots straight into it — no
+   debugger needed to set pc in simulation. */
 #define RVTEST_CODE_BEGIN                                               \
         .section .text.init;                                           \
-        .align 8;                                                      \
+        .option push;                                                  \
+        .option norvc;   /* vector slots must be 4-byte jumps */        \
         .weak mtvec_handler;                                           \
         .globl mtvec_base;                                             \
         .globl _start;                                                 \
 mtvec_base:                                                            \
+        /* ibex trap vector base = boot_addr (0x00100000), VECTORED.    \
+           JUMPS ONLY: one 4-byte slot per cause (exceptions -> slot 0, \
+           interrupts -> base + 4*cause).  _start is NOT in the table. */ \
+        .rept 32;                                                      \
         j trap_entry;                                                  \
-        .align 2;                                                      \
-trap_entry:                                                            \
+        .endr;                                                         \
+        . = mtvec_base + 0x80;                                         \
+_start:                  /* ibex reset PC = boot_addr + 0x80 */         \
+        j reset_vector;                                                \
+        .option pop;                                                   \
+trap_entry:              /* handler lives OUTSIDE the vector table */   \
         csrr t5, mcause;                                               \
         li t6, CAUSE_MACHINE_ECALL;                                    \
         beq t5, t6, write_tohost;                                      \
@@ -57,11 +66,10 @@ handle_exception:                                                      \
 write_tohost:                                                          \
         sw TESTNUM, tohost, t5;                                        \
         j write_tohost;                                                \
-_start:                                                                \
-        j reset_vector;                                                \
 reset_vector:                                                          \
         li TESTNUM, 0;                                                 \
         la t0, mtvec_base;                                             \
+        ori t0, t0, 1;   /* vectored mode */                           \
         csrw mtvec, t0;                                                \
         csrwi mstatus, 0;                                              \
         init;                                                          \

@@ -36,9 +36,27 @@ module ibex_demo_system #(
   input  logic        tms_i,    // JTAG test mode select pad
   input  logic        trst_ni,  // JTAG test reset pad
   input  logic        td_i,     // JTAG test data input pad
-  output logic        td_o      // JTAG test data output pad
+  output logic        td_o,     // JTAG test data output pad
+
+  // Ethernet peripheral (ethsoc SGMII eth MAC + gig PCS/PMA).  clk_eth_int_i is
+  // a free-running fabric clock for the IP's independent_clock (use clk_sys).
+  input  logic        clk_eth_int_i,
+  input  wire         sgmii_rxp,
+  input  wire         sgmii_rxn,
+  output wire         sgmii_txp,
+  output wire         sgmii_txn,
+  input  wire         sgmii_refclk_p,
+  input  wire         sgmii_refclk_n,
+  output wire         eth_phy_reset_n,
+  input  wire         eth_mdio_i,
+  output wire         eth_mdio_o,
+  output wire         eth_mdio_oe,
+  output wire         eth_mdc
 );
-  localparam logic [31:0] MEM_SIZE      = 128 * 1024; // 128 KiB
+  localparam logic [31:0] MEM_SIZE      = 16 * 1024; // 16 KiB (TEMP: Depth 4096 fits
+                                                     // memlower's single-tile byte-write
+                                                     // RAMB path; restore 128 KiB once
+                                                     // deep-depth (x1) tiling lands)
   localparam logic [31:0] MEM_START     = 32'h00100000;
   localparam logic [31:0] MEM_MASK      = ~(MEM_SIZE-1);
 
@@ -71,6 +89,13 @@ module ibex_demo_system #(
   parameter logic [31:0] SIM_CTRL_START = 32'h20000;
   parameter logic [31:0] SIM_CTRL_MASK  = ~(SIM_CTRL_SIZE-1);
 
+  // Ethernet peripheral (ethsoc framing_top_sgmii): 128 KiB window (RX buffers
+  // at +0x1_0000 dominate the size).  Registers +0x0800, TX buffer +0x1000,
+  // pcspma status at +0x0.
+  localparam logic [31:0] ETH_SIZE      = 128 * 1024; // 128 KiB
+  localparam logic [31:0] ETH_START     = 32'h80100000;
+  localparam logic [31:0] ETH_MASK      = ~(ETH_SIZE-1);
+
   // Debug functionality is optional.
   localparam bit DBG = 1;
   localparam int unsigned DbgHwBreakNum = (DBG == 1) ?    2 :    0;
@@ -89,15 +114,17 @@ module ibex_demo_system #(
     Timer,
     Spi,
     SimCtrl,
+    Eth,
     DbgDev
   } bus_device_e;
 
-  localparam int NrDevices = DBG ? 8 : 7;
+  localparam int NrDevices = DBG ? 9 : 8;
   localparam int NrHosts   = DBG ? 2 : 1;
 
   // Interrupts.
   logic timer_irq;
   logic uart_irq;
+  logic eth_irq;
 
   // Host signals.
   logic        host_req      [NrHosts];
@@ -164,6 +191,8 @@ module ibex_demo_system #(
   assign cfg_device_addr_mask[Spi]     = SPI_MASK;
   assign cfg_device_addr_base[SimCtrl] = SIM_CTRL_START;
   assign cfg_device_addr_mask[SimCtrl] = SIM_CTRL_MASK;
+  assign cfg_device_addr_base[Eth]     = ETH_START;
+  assign cfg_device_addr_mask[Eth]     = ETH_MASK;
 
   if (DBG) begin : g_dbg_device_cfg
     assign cfg_device_addr_base[DbgDev] = DEBUG_START;
@@ -178,6 +207,7 @@ module ibex_demo_system #(
   assign device_err[Uart]    = 1'b0;
   assign device_err[Spi]     = 1'b0;
   assign device_err[SimCtrl] = 1'b0;
+  assign device_err[Eth]     = 1'b0;
 
   bus #(
     .NrDevices    ( NrDevices ),
@@ -233,6 +263,10 @@ module ibex_demo_system #(
 
   assign rst_core_n = rst_sys_ni & ~ndmreset_req;
 
+  // Stop-on-load reverted: the core runs from boot_addr at reset (fetch_enable
+  // tied On, debug_req = dm_debug_req only).  No cpu_go gating and no debug-park
+  // one-shot, so there are no hidden side effects on the core's run/halt state.
+
   ibex_top #(
     .RegFile         ( RegFile                                 ),
     .MHPMCounterNum  ( 10                                      ),
@@ -277,7 +311,7 @@ module ibex_demo_system #(
     .irq_software_i(1'b0),
     .irq_timer_i   (timer_irq),
     .irq_external_i(1'b0),
-    .irq_fast_i    ({14'b0, uart_irq}),
+    .irq_fast_i    ({13'b0, eth_irq, uart_irq}),
     .irq_nm_i      (1'b0),
 
     .scramble_key_valid_i('0),
@@ -289,7 +323,7 @@ module ibex_demo_system #(
     .crash_dump_o       (),
     .double_fault_seen_o(),
 
-    .fetch_enable_i        ('1),
+    .fetch_enable_i        (ibex_pkg::IbexMuBiOn),
     .alert_minor_o         (),
     .alert_major_internal_o(),
     .alert_major_bus_o     (),
@@ -376,6 +410,35 @@ module ibex_demo_system #(
     .uart_rx_i,
     .uart_irq_o     (uart_irq),
     .uart_tx_o
+  );
+
+  eth_dev u_eth (
+    .clk_i    (clk_sys_i),
+    .rst_ni   (rst_sys_ni),
+    .clk_int_i(clk_eth_int_i),
+    .rst_int_i(~rst_sys_ni),
+
+    .device_req_i   (device_req[Eth]),
+    .device_addr_i  (device_addr[Eth]),
+    .device_we_i    (device_we[Eth]),
+    .device_be_i    (device_be[Eth]),
+    .device_wdata_i (device_wdata[Eth]),
+    .device_rvalid_o(device_rvalid[Eth]),
+    .device_rdata_o (device_rdata[Eth]),
+
+    .eth_irq_o      (eth_irq),
+
+    .sgmii_rxp      (sgmii_rxp),
+    .sgmii_rxn      (sgmii_rxn),
+    .sgmii_txp      (sgmii_txp),
+    .sgmii_txn      (sgmii_txn),
+    .sgmii_refclk_p (sgmii_refclk_p),
+    .sgmii_refclk_n (sgmii_refclk_n),
+    .phy_reset_n    (eth_phy_reset_n),
+    .phy_mdio_i     (eth_mdio_i),
+    .phy_mdio_o     (eth_mdio_o),
+    .phy_mdio_oe    (eth_mdio_oe),
+    .phy_mdc        (eth_mdc)
   );
 
   spi_top #(

@@ -5,7 +5,7 @@
 `include "prim_assert.sv"
 
 // Prevent Vivado from performing optimizations on/across this module.
-(* DONT_TOUCH = "yes" *)
+// DONT_TOUCH removed for VC707 open-flow: lets flatten_hierarchy=full dissolve the wrapper (vector out port orphaned SVS flatten)
 module prim_xilinx_flop #(
   parameter int               Width      = 1,
   parameter logic [Width-1:0] ResetValue = 0

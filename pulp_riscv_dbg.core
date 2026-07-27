@@ -43,6 +43,7 @@ targets:
       - files_src
       - tool_verilator ? (files_verilator)
       - target_synth ? (files_xilinx_bscane_tap)
+      - target_synth_vc707 ? (files_xilinx_bscane_tap)
       - target_synth_cw305 ? (files_xilinx_bscane_tap)
       - target_synth_cw312a35 ? (files_xilinx_bscane_tap)
       - target_synth_blackboard ? (files_xilinx_bscane_tap)
