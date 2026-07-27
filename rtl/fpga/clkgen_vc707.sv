@@ -15,7 +15,7 @@ module clkgen_vc707 (
 );
   logic locked_mmcm;
   logic io_clk_buf;
-  logic clk_50_unbuf;
+  logic clk_sys_unbuf;
   logic clk_fb;
 
   IBUFDS io_clk_ibufds (
@@ -24,7 +24,9 @@ module clkgen_vc707 (
     .O (io_clk_buf)
   );
 
-  // 200 MHz x5 = 1 GHz VCO; /20 = 50 MHz
+  // 200 MHz x5 = 1 GHz VCO; /40 = 25 MHz.  The open flow (nextpnr, no proper
+  // hold STA) does not reliably close 50 MHz for the debug-module CDC, so the
+  // core clock is set to 25 MHz here at the source -- no post-route fasm patch.
   MMCME2_ADV #(
     .BANDWIDTH          ("OPTIMIZED"),
     .COMPENSATION       ("ZHOLD"),
@@ -32,14 +34,14 @@ module clkgen_vc707 (
     .DIVCLK_DIVIDE      (1),
     .CLKFBOUT_MULT_F    (5.000),
     .CLKFBOUT_PHASE     (0.000),
-    .CLKOUT0_DIVIDE_F   (20.000),
+    .CLKOUT0_DIVIDE_F   (40.000),
     .CLKOUT0_PHASE      (0.000),
     .CLKOUT0_DUTY_CYCLE (0.500),
     .CLKIN1_PERIOD      (5.000)
   ) mmcm (
     .CLKFBOUT (clk_fb),
     .CLKFBOUTB(),
-    .CLKOUT0  (clk_50_unbuf),
+    .CLKOUT0  (clk_sys_unbuf),
     .CLKOUT0B (), .CLKOUT1(), .CLKOUT1B(), .CLKOUT2(), .CLKOUT2B(),
     .CLKOUT3  (), .CLKOUT3B(), .CLKOUT4(), .CLKOUT5(), .CLKOUT6(),
     .CLKFBIN  (clk_fb),
@@ -55,8 +57,8 @@ module clkgen_vc707 (
     .RST      (1'b0)
   );
 
-  BUFG clk_50_bufg (
-    .I(clk_50_unbuf),
+  BUFG clk_sys_bufg (
+    .I(clk_sys_unbuf),
     .O(clk_sys)
   );
 
