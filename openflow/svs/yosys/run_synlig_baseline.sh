@@ -7,7 +7,10 @@
 # functional bit.)
 # ---------------------------------------------------------------------------
 set -eu
-REPO=/home/jonathan/v7-johnson-demo/ibexsoc
+# Relocatable: REPO = ibexsoc root, four levels up from this script.
+HERE=$(cd "$(dirname "$0")" && pwd)
+REPO=${REPO:-$(cd "$HERE/../../../.." && pwd)}
+export SVS_REPO="$REPO"
 LUA=$REPO/openflow/svs/ibex_mini_svs.lua
 SYNLIG=/home/jonathan/synlig/build/release/synlig/synlig
 # GNU coreutils: on macOS `readlink -f`/`dirname` are the g-prefixed brew tools.
@@ -17,8 +20,10 @@ YSHARE=$($DIRNAME $($DIRNAME $($READLINK -f /home/jonathan/OpenROAD-flow-scripts
 W=${W:-/tmp/svs_ibex_synlig}
 mkdir -p "$W"
 
-# file list from the SVS lua (drop the .vmem-only helper if any)
-grep -oE '/home/jonathan/v7-johnson-demo/ibexsoc/[^"]*\.sv' "$LUA" > "$W/files.txt"
+# file list from the SVS lua: the paths are now REPO.."/vendor/...sv" entries,
+# so extract the relative tail and re-root it at $REPO.
+grep -oE 'REPO\.\."/[^"]*\.sv"' "$LUA" | grep -oE '/[^"]*\.sv' \
+  | while read -r rel; do echo "$REPO$rel"; done > "$W/files.txt"
 echo "  $(wc -l < "$W/files.txt") source files"
 
 INC="-I$REPO/vendor/lowrisc_ip/ip/prim/rtl -I$REPO/vendor/lowrisc_ibex/vendor/lowrisc_ip/dv/sv/dv_utils"

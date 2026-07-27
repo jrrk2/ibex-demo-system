@@ -37,12 +37,17 @@ if [ "$STAGE" = "emit" ] || [ "$STAGE" = "all" ]; then
   export SVS_DEFINE='FPGA_XILINX=1;PRIM_DEFAULT_IMPL=prim_pkg::ImplXilinx;VC707=1;SYNTHESIS=1'
   export MEMLOWER_FPGA=1 MEMLOWER_NO_LUTRAM=1
   export SVS_INCDIR="$REPO/vendor/lowrisc_ip/ip/prim/rtl:$REPO/vendor/lowrisc_ibex/vendor/lowrisc_ip/dv/sv/dv_utils"
+  export SVS_REPO="$REPO"        # roots the source paths in ibex_mini_svs.lua
   export SRAM_INIT="$REPO/sw/mini/johnson.vmem"
   # keep primitive #(...) params (RAMB36 INIT, MMCM config, BSCANE2 JTAG_CHAIN)
   export SVS_CIRC_KEEP_PARAMS=1
   export EMIT_CREATE_CIRCUIT="$CC"
   rm -rf "$CC"; mkdir -p "$CC"
-  "$SVS" script "$LUA" >"$W/emit.stdout" 2>"$W/emit.err"
+  if ! "$SVS" script "$LUA" >"$W/emit.stdout" 2>"$W/emit.err"; then
+    echo "SVS emit failed -- tail of $W/emit.err:" >&2
+    tail -25 "$W/emit.err" >&2
+    exit 1
+  fi
   echo "  emitted $(ls "$CC"/*.v | wc -l) modules to $CC"
 fi
 
