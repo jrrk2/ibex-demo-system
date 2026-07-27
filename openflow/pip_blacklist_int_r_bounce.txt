@@ -1,0 +1,31 @@
+# nextpnr-xilinx pip blacklist for the open Virtex-7 flow (xc7vx485t).
+#
+# These 6 INT_R "bounce" input-mux encodings are mis-encoded in the prjxray
+# virtex7 DB: each culprit's positive-bit set is a strict SUBSET of a sibling
+# input on the SAME destination mux, so when nextpnr selects the bounce input
+# fasm2frames emits a bit pattern the silicon mux decodes as the sibling source
+# (or floats).  The net silently routes to the wrong driver, which kills the
+# ibex debug-module logic on hardware.
+#
+# Proven by on-board ddmin bisection (SBDATA0 DMI oracle): avoiding exactly
+# these 6 yields the first fully-booting open-flow ibex (DMI op=0, hart runs);
+# allowing any single one back BREAKS the board.  See memory ethsoc-open-flow-status.
+#
+# Format: TILETYPE.DST.SRC   (consumed via NEXTPNR_PIP_BLACKLIST)
+INT_R.FAN_ALT4.BYP_BOUNCE_N3_7
+INT_R.FAN_ALT4.FAN_BOUNCE7
+INT_R.FAN_ALT4.SR1BEG_S0
+INT_R.IMUX23.FAN_BOUNCE_S3_6
+INT_R.IMUX31.FAN_BOUNCE_S3_6
+INT_R.IMUX32.BYP_BOUNCE_N3_6
+
+# --- Jump-control fix (2026-07-07) ---
+# Two more mis-encoded (golden-never-validated) INT_R pip types found on the
+# ibex pc_mux_id[1] net (the PC-mux select that redirects the PC for an
+# unconditional jump).  With these routed, ALL jumps (jal/jalr/c.j) wedge the
+# pipeline while branches (beq/c.beqz) work -- localized by a staged-marker
+# conformance battery, convicted by re-route: blacklisting these makes
+# diag_cj/jal_fwd reach their target (0x44444444).  Both fan out from wire
+# NW2END3.  See memory ibex-eth-integration (PIP HUNT).
+INT_R.LH12.NW2END3
+INT_R.NE6BEG3.NW2END3
