@@ -25,7 +25,17 @@ YOSYS=${YOSYS:-/home/jonathan/OpenROAD-flow-scripts/tools/install/yosys/bin/yosy
 # GNU coreutils: on macOS `readlink -f`/`dirname` are the g-prefixed brew tools.
 command -v greadlink >/dev/null 2>&1 && READLINK=greadlink || READLINK=readlink
 command -v gdirname  >/dev/null 2>&1 && DIRNAME=gdirname  || DIRNAME=dirname
-YSHARE=$($DIRNAME $($DIRNAME $($READLINK -f "$YOSYS")))/share/yosys
+# yosys' data dir (cells_sim.v etc.).  yosys-config --datdir is authoritative;
+# fall back to deriving it from the RESOLVED binary path ($YOSYS may be a bare
+# PATH name like "yosys", which readlink can't locate on its own).
+if command -v "${YOSYS}-config" >/dev/null 2>&1; then
+  YSHARE=$("${YOSYS}-config" --datdir)
+elif command -v yosys-config >/dev/null 2>&1; then
+  YSHARE=$(yosys-config --datdir)
+else
+  YOSYS_BIN=$(command -v "$YOSYS" 2>/dev/null || echo "$YOSYS")
+  YSHARE=$($DIRNAME $($DIRNAME $($READLINK -f "$YOSYS_BIN")))/share/yosys
+fi
 
 W=${W:-/tmp/svs_ibex_yosys}
 CC=$W/cc
