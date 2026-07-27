@@ -33,7 +33,7 @@ mkdir -p "$W"
 
 if [ "$STAGE" = "emit" ] || [ "$STAGE" = "all" ]; then
   echo "=== [1/2] emit FPGA-variant create_circuit netlist ==="
-  eval "$(opam env)"
+  eval "$(opam env --switch=${OPAM_SWITCH:-5.3.0} 2>/dev/null || opam env)"
   export SVS_DEFINE='FPGA_XILINX=1;PRIM_DEFAULT_IMPL=prim_pkg::ImplXilinx;VC707=1;SYNTHESIS=1'
   export MEMLOWER_FPGA=1 MEMLOWER_NO_LUTRAM=1
   export SVS_INCDIR="$REPO/vendor/lowrisc_ip/ip/prim/rtl:$REPO/vendor/lowrisc_ibex/vendor/lowrisc_ip/dv/sv/dv_utils"
