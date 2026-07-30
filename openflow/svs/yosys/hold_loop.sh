@@ -41,5 +41,8 @@ for it in $(seq 0 $MAX_ITER); do
   if [ "$n" -eq 0 ]; then echo ">>> HOLD CLEAN (no sub-$MARGIN ns endpoints) -- converged in $it iteration(s)"; break; fi
 done
 
-echo "############ OpenSTA signoff ############"
-bash "$ROOT/ethsoc/openflow/opentimer/run_sta_rc.sh" ibex_idx 2>&1 | grep -E "SETUP|HOLD|worst slack" || true
+echo "############ OpenSTA signoff (this route) ############"
+# run_sta_rc.sh now regenerates its netlist from THIS route's json, so the
+# signoff reflects the run we just did (not a stale index-renamed prefix).
+bash "$ROOT/ethsoc/openflow/opentimer/run_sta_rc.sh" "$W/ibex_yosys_routed.json" 2>&1 \
+  | grep -E "SETUP|HOLD|worst slack" || true
