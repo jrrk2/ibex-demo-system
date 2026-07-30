@@ -14,9 +14,11 @@
 # Requires a VALID place_lef input netlist (regenerate ibex_fpga_yosys.json if
 # stale).  Each iteration ~= place_lef 15 min + route 10 min.
 set -eu
-ROOT=/home/jonathan/v7-johnson-demo
-W=$ROOT/build/ibex_yosys
-FLOW=$ROOT/ibexsoc/openflow/svs/yosys/place_route_yosys.sh
+# env-overridable so the top-level Makefile can drive it (passes ROOT/W/SVS/
+# NEXTPNR/CHIPDB, all forwarded to place_route_yosys.sh via the environment).
+ROOT=${ROOT:-/home/jonathan/v7-johnson-demo}
+W=${W:-$ROOT/build/ibex_yosys}
+FLOW=${FLOW:-$ROOT/ibexsoc/openflow/svs/yosys/place_route_yosys.sh}
 TGT=$W/hold_targets.txt
 MARGIN=${HOLD_MARGIN_NS:-0.05}   # only buffer endpoints with hold slack < this
 MAX_ITER=${MAX_ITER:-6}
